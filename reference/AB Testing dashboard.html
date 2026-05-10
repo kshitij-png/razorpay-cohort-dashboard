@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>A/B Test Dashboard — Breeo</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:#f8f7f4;color:#1a1a18;line-height:1.5;min-height:100vh;}
+#app{max-width:1120px;margin:0 auto;padding:32px 24px 80px;}
+:root{
+  --bg:#ffffff;--bg2:#f1efe8;--bg3:#f8f7f4;
+  --text:#1a1a18;--text2:#5f5e5a;--text3:#888780;
+  --border:rgba(26,26,24,0.12);--border2:rgba(26,26,24,0.22);
+  --blue:#2563eb;--gray:#6b7280;
+  --green:#15803d;--green-bg:rgba(21,128,61,0.08);
+  --red:#dc2626;--red-bg:rgba(220,38,38,0.08);
+}
+button{font-family:inherit;cursor:pointer;}
+input{font-family:inherit;}
+#signin-view{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:70vh;gap:24px;text-align:center;}
+.signin-box{background:var(--bg);border:0.5px solid var(--border2);border-radius:14px;padding:40px 48px;display:flex;flex-direction:column;align-items:center;gap:20px;}
+#controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:20px;}
+#controls h1{font-size:20px;font-weight:500;margin-right:auto;}
+.date-group{display:flex;align-items:center;gap:6px;}
+.date-group label{font-size:12px;color:var(--text2);}
+.date-group input[type=date]{padding:6px 10px;border:0.5px solid var(--border2);border-radius:6px;font-size:13px;background:var(--bg);color:var(--text);}
+.btn{padding:7px 16px;font-size:13px;font-weight:500;border-radius:6px;border:none;transition:all 0.15s;}
+.btn-primary{background:#1a1a18;color:#fff;}
+.btn-primary:hover{background:#333;}
+.btn-primary:disabled{background:#ccc;cursor:not-allowed;}
+.btn-share{background:#2563eb;color:#fff;}
+.btn-share:hover{background:#1d4ed8;}
+.btn-config{background:transparent;border:0.5px solid var(--border2);color:var(--text2);font-size:12px;padding:6px 12px;border-radius:6px;}
+.user-chip{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2);padding:6px 12px;background:var(--bg2);border-radius:20px;}
+.user-chip img{width:22px;height:22px;border-radius:50%;}
+.btn-so{background:transparent;border:0.5px solid var(--border2);color:var(--text2);padding:2px 8px;font-size:11px;border-radius:4px;cursor:pointer;}
+#config-panel{background:var(--bg);border:0.5px solid var(--border2);border-radius:10px;padding:20px 24px;margin-bottom:20px;}
+#config-panel h3{font-size:13px;font-weight:600;margin-bottom:4px;}
+#config-panel .sub{font-size:11px;color:var(--text3);margin-bottom:16px;}
+.config-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;}
+.cfg-field label{display:block;font-size:11px;color:var(--text2);font-weight:500;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;}
+.cfg-field input{width:100%;padding:7px 10px;border:0.5px solid var(--border2);border-radius:6px;font-size:13px;background:var(--bg3);color:var(--text);}
+.cfg-field input:focus{outline:none;border-color:var(--blue);}
+.cfg-note{font-size:11px;color:var(--text3);margin-top:4px;}
+#loading{display:flex;align-items:center;justify-content:center;min-height:300px;flex-direction:column;gap:12px;}
+.spinner{width:32px;height:32px;border:3px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin 0.7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.error-banner{background:#fcebeb;color:#a32d2d;border-radius:8px;padding:12px 16px;font-size:13px;margin-bottom:20px;}
+#statsig{background:var(--bg2);border:0.5px solid var(--border);border-radius:12px;padding:20px 24px;margin-bottom:24px;}
+.st-title{font-size:11px;font-weight:500;color:var(--text2);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:16px;}
+.sig-card{background:var(--bg);border:0.5px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:10px;}
+.sig-card:last-child{margin-bottom:0;}
+.sig-hdr{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;}
+.sig-name{font-weight:500;font-size:14px;}
+.sig-badge{font-size:11px;font-weight:600;padding:2px 9px;border-radius:4px;}
+.sig-stat{margin-left:auto;font-size:12px;color:var(--text2);font-family:monospace;}
+.sig-detail{font-size:12px;color:var(--text2);line-height:1.65;margin-bottom:8px;}
+.sig-why{font-size:11px;color:var(--text3);line-height:1.6;border-top:0.5px solid var(--border);padding-top:8px;}
+.st-note{margin-top:12px;font-size:11px;color:var(--text3);line-height:1.6;}
+#summary-cards{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px;}
+.s-card{background:var(--bg);border:0.5px solid var(--border);border-radius:10px;padding:16px;flex:1;min-width:150px;}
+.s-lbl{font-size:10px;color:var(--text2);font-weight:600;margin-bottom:12px;letter-spacing:0.07em;text-transform:uppercase;}
+.s-rows{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:10px;}
+.s-big{font-size:22px;font-weight:500;line-height:1;}
+.s-small{font-size:13px;color:var(--text2);}
+.s-sub{font-size:10px;color:var(--text3);margin-bottom:3px;}
+.dbadge{display:inline-block;padding:3px 8px;border-radius:4px;font-size:12px;font-weight:600;}
+.dp{color:var(--green);background:var(--green-bg);}
+.dn{color:var(--red);background:var(--red-bg);}
+.tab-bar{background:var(--bg2);border-radius:8px;padding:4px;display:inline-flex;gap:2px;margin-bottom:20px;}
+.tab-btn{padding:7px 16px;font-size:13px;font-weight:500;border:none;border-radius:6px;background:transparent;color:var(--text2);transition:all 0.1s;}
+.tab-btn.active{background:var(--bg);color:var(--text);box-shadow:0 0 0 0.5px var(--border2);}
+.cleg{display:flex;gap:20px;margin-bottom:10px;font-size:12px;color:var(--text2);}
+.cleg span{display:flex;align-items:center;gap:6px;}
+.cl{width:20px;height:3px;border-radius:2px;display:inline-block;}
+.cd{width:20px;height:0;display:inline-block;border-top:2.5px dashed #9ca3af;}
+.chart-wrap{position:relative;height:240px;background:var(--bg);border:0.5px solid var(--border);border-radius:8px;padding:12px 8px 8px;margin-bottom:24px;}
+.table-scroll{overflow-x:auto;border-radius:8px;border:0.5px solid var(--border);}
+table{border-collapse:collapse;width:100%;}
+th{padding:9px 12px;font-weight:500;font-size:11px;color:var(--text2);text-align:right;border-bottom:0.5px solid var(--border);white-space:nowrap;letter-spacing:0.04em;text-transform:uppercase;background:var(--bg2);}
+th.L{text-align:left;}
+td{padding:7px 12px;font-size:12px;color:var(--text);text-align:right;border-bottom:0.5px solid var(--border);}
+td.L{text-align:left;}
+td.mono{font-family:monospace;font-size:11px;color:var(--text2);}
+td.blue{color:var(--blue);}
+td.gray{color:var(--gray);}
+td.bold{font-weight:600;}
+tr.tot{background:var(--bg2);}
+tr.alt{background:rgba(241,239,232,0.45);}
+.dc{text-align:right;font-weight:600;font-size:12px;}
+.dc.pos{color:var(--green);background:rgba(21,128,61,0.06);}
+.dc.neg{color:var(--red);background:rgba(220,38,38,0.06);}
+#toast{position:fixed;bottom:32px;left:50%;transform:translateX(-50%) translateY(80px);background:#1a1a18;color:#fff;padding:12px 20px;border-radius:8px;font-size:13px;transition:transform 0.3s;z-index:999;white-space:nowrap;}
+#toast.show{transform:translateX(-50%) translateY(0);}
+#shared-banner{background:#fef3c7;border:0.5px solid #f59e0b;border-radius:8px;padding:10px 16px;font-size:12px;color:#92400e;margin-bottom:20px;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast"></div>
+<script>
+const CLIENT_ID='807583852970-cghdh4ril16q6dl05bvt6inrst8dfamr.apps.googleusercontent.com';
+const SCOPES='https://www.googleapis.com/auth/analytics.readonly';
+const DEFAULT_CONFIG={
+  propertyId:'382602797',
+  dimensionName:'customEvent:puja_package_flow',
+  variantValue:'variant',
+  controlValue:'control',
+  landingPagePrefix:'/mandir-puja/',
+  itemCategory:'Mandir Puja',
+};
+
+let state={
+  user:null,accessToken:null,results:null,activeTab:'cvr',
+  loading:false,error:null,isSharedView:false,
+  startDate:'',endDate:'',showConfig:false,
+  config:{...DEFAULT_CONFIG},generatedAt:null,_pendingFetch:false,
+};
+
+// ── MATH ──
+function normalCDF(x){const t=1/(1+0.2316419*Math.abs(x));const poly=t*(0.319381530+t*(-0.356563782+t*(1.781477937+t*(-1.821255978+t*1.330274429))));const p=1-Math.exp(-x*x/2)/Math.sqrt(2*Math.PI)*poly;return x<0?1-p:p;}
+function zTest(x1,n1,x2,n2){if(!n1||!n2)return{z:0,p:1,p1:0,p2:0,ci95:[0,0]};const p1=x1/n1,p2=x2/n2,pp=(x1+x2)/(n1+n2);const se=Math.sqrt(pp*(1-pp)*(1/n1+1/n2));if(!se)return{z:0,p:1,p1,p2,ci95:[p1-p2,p1-p2]};const z=(p1-p2)/se,p=2*(1-normalCDF(Math.abs(z)));const seD=Math.sqrt(p1*(1-p1)/n1+p2*(1-p2)/n2);return{z,p,p1,p2,ci95:[(p1-p2)-1.96*seD,(p1-p2)+1.96*seD]};}
+function mean(a){return a.length?a.reduce((s,v)=>s+v,0)/a.length:0;}
+function variance(a){if(a.length<2)return 0;const m=mean(a);return a.reduce((s,v)=>s+(v-m)**2,0)/(a.length-1);}
+function welchT(a,b){const n1=a.length,n2=b.length;if(n1<2||n2<2)return{t:0,p:1,df:0,m1:mean(a),m2:mean(b)};const m1=mean(a),m2=mean(b),v1=variance(a),v2=variance(b);const se=Math.sqrt(v1/n1+v2/n2);if(!se)return{t:0,p:1,df:0,m1,m2};const t=(m1-m2)/se;const df=(v1/n1+v2/n2)**2/((v1/n1)**2/(n1-1)+(v2/n2)**2/(n2-1));return{t,p:2*(1-normalCDF(Math.abs(t))),df,m1,m2};}
+
+// ── FORMATTERS ──
+const fmt={
+  pct:(v,d=2)=>v==null?'—':`${(v*100).toFixed(d)}%`,
+  delta:(v)=>v==null?'—':`${v>=0?'+':''}${v.toFixed(2)}%`,
+  currency:(v)=>v==null?'—':`₹${Number(v).toLocaleString('en-IN',{maximumFractionDigits:0})}`,
+  num:(v)=>v==null?'—':Number(v).toLocaleString('en-IN'),
+  date:(s)=>{if(!s)return s;if(/^\d{8}$/.test(s))return`${s.slice(6,8)}/${s.slice(4,6)}/${s.slice(2,4)}`;if(/^\d{4}-\d{2}-\d{2}$/.test(s))return`${s.slice(8,10)}/${s.slice(5,7)}/${s.slice(2,4)}`;return s;}
+};
+function sigLabel(p){if(p<0.05)return{label:'Significant ✓',color:'#15803d',bg:'#dcfce7'};if(p<0.10)return{label:'Trending ~',color:'#92400e',bg:'#fef3c7'};return{label:'Not significant ✗',color:'#991b1b',bg:'#fee2e2'};}
+
+function initDates(){const e=new Date(),s=new Date();s.setDate(s.getDate()-29);state.endDate=e.toISOString().slice(0,10);state.startDate=s.toISOString().slice(0,10);}
+
+// ── GA4 API ──
+async function ga4Post(token,propertyId,body){
+  const r=await fetch(`https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,{method:'POST',headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e?.error?.message||`GA4 error ${r.status}`);}
+  return r.json();
+}
+
+async function fetchVisitors(token,sd,ed,cfg){
+  return ga4Post(token,cfg.propertyId,{
+    dateRanges:[{startDate:sd,endDate:ed}],
+    dimensions:[{name:'date'},{name:cfg.dimensionName}],
+    metrics:[{name:'sessions'},{name:'activeUsers'}],
+    dimensionFilter:{andGroup:{expressions:[
+      {filter:{fieldName:cfg.dimensionName,inListFilter:{values:[cfg.variantValue,cfg.controlValue]}}},
+      {filter:{fieldName:'landingPage',stringFilter:{matchType:'BEGINS_WITH',value:cfg.landingPagePrefix}}}
+    ]}},
+    orderBys:[{dimension:{dimensionName:'date'}}],limit:10000,
+  });
+}
+
+async function fetchPurchases(token,sd,ed,cfg){
+  return ga4Post(token,cfg.propertyId,{
+    dateRanges:[{startDate:sd,endDate:ed}],
+    dimensions:[{name:'date'},{name:cfg.dimensionName}],
+    metrics:[{name:'conversions'},{name:'purchaseRevenue'}],
+    dimensionFilter:{andGroup:{expressions:[
+      {filter:{fieldName:cfg.dimensionName,inListFilter:{values:[cfg.variantValue,cfg.controlValue]}}},
+      {filter:{fieldName:'itemCategory',stringFilter:{matchType:'EXACT',value:cfg.itemCategory}}}
+    ]}},
+    orderBys:[{dimension:{dimensionName:'date'}}],limit:10000,
+  });
+}
+
+function toMap(rows,cfg){
+  const map={};
+  for(const row of (rows||[])){
+    const date=row.dimensionValues[0].value,flow=row.dimensionValues[1].value;
+    const m1=parseFloat(row.metricValues[0].value)||0,m2=parseFloat(row.metricValues[1].value)||0;
+    if(!map[date])map[date]={variant:null,control:null};
+    if(flow===cfg.variantValue)map[date].variant={m1,m2};
+    else if(flow===cfg.controlValue)map[date].control={m1,m2};
+  }
+  return map;
+}
+
+function process(visMap,purMap){
+  const empty={sessions:0,activeUsers:0,purchases:0,revenue:0};
+  const dates=[...new Set([...Object.keys(visMap),...Object.keys(purMap)])].sort();
+  const daily=dates.map(date=>{
+    const mk=(vis,pur)=>({
+      sessions:vis?.m1||0,activeUsers:vis?.m2||0,purchases:pur?.m1||0,revenue:pur?.m2||0,
+    });
+    const addM=d=>({...d,cvr:d.sessions>0?d.purchases/d.sessions:null,aov:d.purchases>0?d.revenue/d.purchases:null,rpv:d.activeUsers>0?d.revenue/d.activeUsers:null});
+    const v=addM(mk(visMap[date]?.variant,purMap[date]?.variant));
+    const c=addM(mk(visMap[date]?.control,purMap[date]?.control));
+    const delta=(a,b)=>b!=null&&b!==0&&a!=null?(a-b)/b*100:null;
+    return{date,variant:v,control:c,delta:{cvr:delta(v.cvr,c.cvr),aov:delta(v.aov,c.aov),rpv:delta(v.rpv,c.rpv)}};
+  });
+  const tot={variant:{...empty},control:{...empty}};
+  for(const d of daily)for(const fl of['variant','control']){tot[fl].sessions+=d[fl].sessions;tot[fl].purchases+=d[fl].purchases;tot[fl].revenue+=d[fl].revenue;tot[fl].activeUsers+=d[fl].activeUsers;}
+  const cvrSig=zTest(tot.variant.purchases,tot.variant.sessions,tot.control.purchases,tot.control.sessions);
+  const aovSig=welchT(daily.filter(d=>d.variant.aov!=null).map(d=>d.variant.aov),daily.filter(d=>d.control.aov!=null).map(d=>d.control.aov));
+  const rpvSig=welchT(daily.filter(d=>d.variant.rpv!=null).map(d=>d.variant.rpv),daily.filter(d=>d.control.rpv!=null).map(d=>d.control.rpv));
+  return{daily,totals:tot,cvrSig,aovSig,rpvSig};
+}
+
+// ── AUTH ──
+let tokenClient=null;
+function initGoogleAuth(){
+  tokenClient=google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:SCOPES,callback:(resp)=>{
+    if(resp.error){state.error='Sign-in failed: '+resp.error;state.loading=false;render();return;}
+    state.accessToken=resp.access_token;
+    fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:`Bearer ${resp.access_token}`}})
+      .then(r=>r.json()).then(u=>{state.user={name:u.name,email:u.email,picture:u.picture};render();if(state._pendingFetch){state._pendingFetch=false;runQuery();}});
+  }});
+}
+function signIn(){if(tokenClient)tokenClient.requestAccessToken({prompt:''});}
+function signOut(){if(state.accessToken)google.accounts.oauth2.revoke(state.accessToken,()=>{});state.user=null;state.accessToken=null;state.results=null;render();}
+
+// ── QUERY ──
+async function runQuery(){
+  if(!state.accessToken){state._pendingFetch=true;signIn();return;}
+  state.loading=true;state.error=null;render();
+  try{
+    const cfg=state.config;
+    const[vr,pr]=await Promise.all([fetchVisitors(state.accessToken,state.startDate,state.endDate,cfg),fetchPurchases(state.accessToken,state.startDate,state.endDate,cfg)]);
+    state.results=process(toMap(vr.rows,cfg),toMap(pr.rows,cfg));
+    if(!state.results.daily.length)throw new Error('No data returned. Check your date range and config (landing page prefix, item category, dimension name).');
+  }catch(e){state.error=e.message;}
+  state.loading=false;render();
+}
+
+// ── SHARE ──
+async function share(){
+  if(!state.results)return;
+  const payload=JSON.stringify({results:state.results,startDate:state.startDate,endDate:state.endDate,config:state.config,generatedAt:new Date().toISOString()});
+  const compressed=LZString.compressToEncodedURIComponent(payload);
+  const longUrl=`${location.href.split('#')[0]}#data=${compressed}`;
+  let finalUrl=longUrl;
+  try{const r=await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(longUrl)}`);if(r.ok)finalUrl=await r.text();}catch(e){}
+  await navigator.clipboard.writeText(finalUrl).catch(()=>{prompt('Copy this link:',finalUrl);});
+  showToast('Link copied! 🔗');
+}
+
+function checkSharedUrl(){
+  if(location.hash.startsWith('#data=')){
+    try{const p=JSON.parse(LZString.decompressFromEncodedURIComponent(location.hash.slice(6)));state.results=p.results;state.startDate=p.startDate||'';state.endDate=p.endDate||'';state.config=p.config||{...DEFAULT_CONFIG};state.isSharedView=true;state.generatedAt=p.generatedAt;}
+    catch(e){state.error='Could not decode shared link.';}
+  }
+}
+
+function showToast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),3000);}
+
+// ── CHART ──
+let chart=null;
+function renderChart(daily,metric){
+  const canvas=document.getElementById('metric-chart');
+  if(!canvas)return;
+  if(chart){chart.destroy();chart=null;}
+  const toN=v=>v==null?null:parseFloat(metric==='cvr'?(v*100).toFixed(3):v.toFixed(0));
+  chart=new Chart(canvas,{type:'line',data:{labels:daily.map(d=>fmt.date(d.date)),datasets:[
+    {label:'Variant',data:daily.map(d=>toN(d.variant[metric])),borderColor:'#2563eb',backgroundColor:'rgba(37,99,235,0.07)',fill:true,tension:0.3,borderWidth:2,pointRadius:3,spanGaps:true},
+    {label:'Control',data:daily.map(d=>toN(d.control[metric])),borderColor:'#9ca3af',backgroundColor:'rgba(156,163,175,0.04)',fill:true,tension:0.3,borderWidth:2,borderDash:[5,3],pointRadius:3,spanGaps:true},
+  ]},options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:(ctx)=>`${ctx.dataset.label}: ${metric==='cvr'?ctx.raw+'%':'₹'+(ctx.raw||0).toLocaleString('en-IN')}`}}},
+    scales:{x:{ticks:{font:{size:10},maxRotation:45,color:'#9ca3af',autoSkip:true,maxTicksLimit:14},grid:{color:'rgba(156,163,175,0.12)'}},
+      y:{ticks:{font:{size:10},color:'#9ca3af',callback:v=>metric==='cvr'?v+'%':'₹'+(v||0).toLocaleString('en-IN')},grid:{color:'rgba(156,163,175,0.12)'},title:{display:true,text:metric==='cvr'?'CVR (%)':metric==='aov'?'AOV (₹)':'RPV (₹)',font:{size:11},color:'#9ca3af'}}}
+  }});
+}
+
+// ── RENDER SECTIONS ──
+function rStatSig(r){
+  const{cvrSig,aovSig,rpvSig,totals}=r;
+  const ms=[
+    {name:'Conversion Rate (CVR)',stat:`z = ${cvrSig.z.toFixed(3)}`,p:cvrSig.p,
+     detail:`Variant: ${fmt.pct(cvrSig.p1,3)} (${fmt.num(totals.variant.purchases)} purchases / ${fmt.num(totals.variant.sessions)} sessions) vs Control: ${fmt.pct(cvrSig.p2,3)} (${fmt.num(totals.control.purchases)} / ${fmt.num(totals.control.sessions)}). 95% CI: [${fmt.pct(cvrSig.ci95[0],3)}, ${fmt.pct(cvrSig.ci95[1],3)}].`,
+     why:'Z-test on cumulative proportions — industry standard for CVR. Sessions from visitors query, purchases from purchases query — kept separate to avoid contamination.'},
+    {name:'Average Order Value (AOV)',stat:`t = ${aovSig.t.toFixed(3)}, df = ${Math.round(aovSig.df||0)}`,p:aovSig.p,
+     detail:`Variant mean AOV: ${fmt.currency(aovSig.m1)} vs Control: ${fmt.currency(aovSig.m2)}. t(${Math.round(aovSig.df||0)}) = ${aovSig.t.toFixed(3)}, p = ${aovSig.p<0.001?'<0.001':aovSig.p.toFixed(4)}.`,
+     why:"Welch's t-test on daily AOV values. Doesn't assume equal variance between the two flows."},
+    {name:'Revenue per Visitor (RPV)',stat:`t = ${rpvSig.t.toFixed(3)}, df = ${Math.round(rpvSig.df||0)}`,p:rpvSig.p,
+     detail:`Variant mean RPV: ${fmt.currency(rpvSig.m1)} vs Control: ${fmt.currency(rpvSig.m2)}. t(${Math.round(rpvSig.df||0)}) = ${rpvSig.t.toFixed(3)}, p = ${rpvSig.p<0.001?'<0.001':rpvSig.p.toFixed(4)}.`,
+     why:'Most important e-commerce A/B metric — combines CVR and AOV. Welch\'s t-test on daily aggregates.'},
+  ];
+  return`<div id="statsig"><div class="st-title">Statistical significance · α = 0.05</div>${ms.map(m=>{const s=sigLabel(m.p);return`<div class="sig-card"><div class="sig-hdr"><span class="sig-name">${m.name}</span><span class="sig-badge" style="background:${s.bg};color:${s.color}">${s.label}</span><span class="sig-stat">${m.stat} · p = ${m.p<0.001?'<0.001':m.p.toFixed(4)}</span></div><div class="sig-detail">${m.detail}</div><div class="sig-why"><strong>Why this method: </strong>${m.why}</div></div>`;}).join('')}<div class="st-note">⚠ AOV and RPV use daily aggregates — treat as directional. CVR z-test on cumulative totals is robust.</div></div>`;
+}
+
+function rCards(r){
+  const{totals:t}=r;
+  const vCVR=t.variant.sessions?t.variant.purchases/t.variant.sessions:0,cCVR=t.control.sessions?t.control.purchases/t.control.sessions:0;
+  const vAOV=t.variant.purchases?t.variant.revenue/t.variant.purchases:0,cAOV=t.control.purchases?t.control.revenue/t.control.purchases:0;
+  const vRPV=t.variant.activeUsers?t.variant.revenue/t.variant.activeUsers:0,cRPV=t.control.activeUsers?t.control.revenue/t.control.activeUsers:0;
+  const cards=[{l:'CVR',v:fmt.pct(vCVR,3),c:fmt.pct(cCVR,3),d:cCVR?(vCVR-cCVR)/cCVR*100:null},{l:'AOV',v:fmt.currency(vAOV),c:fmt.currency(cAOV),d:cAOV?(vAOV-cAOV)/cAOV*100:null},{l:'RPV',v:fmt.currency(vRPV),c:fmt.currency(cRPV),d:cRPV?(vRPV-cRPV)/cRPV*100:null}];
+  return`<div id="summary-cards">${cards.map(({l,v,c,d})=>`<div class="s-card"><div class="s-lbl">${l}</div><div class="s-rows"><div><div class="s-sub">Variant</div><div class="s-big">${v}</div></div><div style="text-align:right"><div class="s-sub">Control</div><div class="s-small">${c}</div></div></div>${d!=null?`<span class="dbadge ${d>=0?'dp':'dn'}">${fmt.delta(d)} vs control</span>`:''}</div>`).join('')}<div class="s-card" style="background:var(--bg2)"><div class="s-lbl">Sessions</div><div class="s-sub">Variant</div><div class="s-big" style="font-size:20px;margin-bottom:10px">${fmt.num(t.variant.sessions)}</div><div class="s-sub">Control</div><div class="s-small">${fmt.num(t.control.sessions)}</div></div></div>`;
+}
+
+function rTable(r,metric){
+  const cf={cvr:{l:'CVR',f:v=>fmt.pct(v,3)},aov:{l:'AOV',f:v=>fmt.currency(v)},rpv:{l:'RPV',f:v=>fmt.currency(v)}};
+  const{daily,totals:t}=r;
+  const tV={cvr:t.variant.sessions?t.variant.purchases/t.variant.sessions:null,aov:t.variant.purchases?t.variant.revenue/t.variant.purchases:null,rpv:t.variant.activeUsers?t.variant.revenue/t.variant.activeUsers:null};
+  const tC={cvr:t.control.sessions?t.control.purchases/t.control.sessions:null,aov:t.control.purchases?t.control.revenue/t.control.purchases:null,rpv:t.control.activeUsers?t.control.revenue/t.control.activeUsers:null};
+  const tD=tC[metric]&&tC[metric]!==0&&tV[metric]!=null?(tV[metric]-tC[metric])/tC[metric]*100:null;
+  const dc=v=>v==null?`<td style="color:var(--text3);padding:7px 12px;text-align:right;border-bottom:0.5px solid var(--border)">—</td>`:`<td class="dc ${v>=0?'pos':'neg'}" style="padding:7px 10px;border-bottom:0.5px solid var(--border)">${fmt.delta(v)}</td>`;
+  return`<div class="table-scroll"><table><thead><tr><th class="L">Date</th><th>V Sessions</th><th>V Purchases</th><th style="color:var(--blue)">Variant ${cf[metric].l}</th><th>C Sessions</th><th>C Purchases</th><th style="color:var(--gray)">Control ${cf[metric].l}</th><th style="text-align:center">Δ vs Control</th></tr></thead><tbody><tr class="tot"><td class="L bold">Overall</td><td class="bold">${fmt.num(t.variant.sessions)}</td><td class="bold">${fmt.num(t.variant.purchases)}</td><td class="blue bold">${cf[metric].f(tV[metric])}</td><td class="bold">${fmt.num(t.control.sessions)}</td><td class="bold">${fmt.num(t.control.purchases)}</td><td class="gray bold">${cf[metric].f(tC[metric])}</td>${dc(tD)}</tr>${[...daily].reverse().map((row,i)=>`<tr ${i%2===1?'class="alt"':''}><td class="L mono">${fmt.date(row.date)}</td><td>${fmt.num(row.variant.sessions)}</td><td>${fmt.num(row.variant.purchases)}</td><td class="blue">${cf[metric].f(row.variant[metric])}</td><td>${fmt.num(row.control.sessions)}</td><td>${fmt.num(row.control.purchases)}</td><td class="gray">${cf[metric].f(row.control[metric])}</td>${dc(row.delta[metric])}</tr>`).join('')}</tbody></table></div>`;
+}
+
+function rDashboard(r){
+  return`${rStatSig(r)}${rCards(r)}<div class="tab-bar"><button class="tab-btn ${state.activeTab==='cvr'?'active':''}" data-tab="cvr">Conversion Rate</button><button class="tab-btn ${state.activeTab==='aov'?'active':''}" data-tab="aov">Avg Order Value</button><button class="tab-btn ${state.activeTab==='rpv'?'active':''}" data-tab="rpv">Revenue / Visitor</button></div><div class="cleg"><span><span class="cl" style="background:#2563eb"></span>Variant</span><span><span class="cd"></span>Control</span></div><div class="chart-wrap"><canvas id="metric-chart" role="img"></canvas></div>${rTable(r,state.activeTab)}`;
+}
+
+function rConfig(){
+  const c=state.config;
+  return`<div id="config-panel"><h3>⚙ Experiment Config</h3><div class="sub">Change these for each new A/B test. Takes effect on next Run.</div><div class="config-grid">
+    <div class="cfg-field"><label>GA4 Property ID</label><input id="c-pid" value="${c.propertyId}"/></div>
+    <div class="cfg-field"><label>Flow Dimension Name</label><input id="c-dim" value="${c.dimensionName}"/><div class="cfg-note">The custom dimension holding variant/control</div></div>
+    <div class="cfg-field"><label>Variant Value</label><input id="c-var" value="${c.variantValue}"/></div>
+    <div class="cfg-field"><label>Control Value</label><input id="c-con" value="${c.controlValue}"/></div>
+    <div class="cfg-field"><label>Landing Page Prefix</label><input id="c-lp" value="${c.landingPagePrefix}"/><div class="cfg-note">Visitors: sessions where landing page begins with this</div></div>
+    <div class="cfg-field"><label>Item Category</label><input id="c-ic" value="${c.itemCategory}"/><div class="cfg-note">Purchases: only where item_category exactly matches this</div></div>
+  </div></div>`;
+}
+
+// ── MAIN RENDER ──
+function render(){
+  const app=document.getElementById('app');
+
+  if(state.isSharedView&&state.results){
+    const gd=state.generatedAt?new Date(state.generatedAt).toLocaleString('en-IN'):'';
+    app.innerHTML=`<div id="controls"><h1>A/B Test Dashboard</h1><div style="font-size:12px;color:var(--text2);margin-right:auto">${state.startDate?`${fmt.date(state.startDate)} → ${fmt.date(state.endDate)}`:''}</div></div><div id="shared-banner">📎 Shared snapshot${gd?` · generated ${gd}`:''}. Frozen at time of sharing. <a href="${location.href.split('#')[0]}" style="color:#92400e;font-weight:500;margin-left:8px">Open live dashboard →</a></div>${rDashboard(state.results)}`;
+    setTimeout(()=>renderChart(state.results.daily,state.activeTab),50);
+    bindTabs();return;
+  }
+
+  if(!state.user){
+    app.innerHTML=`<div id="signin-view"><div class="signin-box"><div style="font-size:36px">📊</div><h1 style="font-size:22px;font-weight:500">A/B Test Dashboard</h1><p style="font-size:13px;color:var(--text2);max-width:380px;text-align:center">Sign in with your Breeo Google account to query live A/B test data from GA4.</p><button class="btn btn-primary" onclick="signIn()" style="padding:10px 28px;font-size:14px">Sign in with Google</button><div style="font-size:11px;color:var(--text3)">Only breeo.in accounts can access this dashboard.</div></div></div>`;
+    return;
+  }
+
+  const r=state.results;
+  app.innerHTML=`
+  <div id="controls">
+    <h1>A/B Test Dashboard</h1>
+    <div class="date-group"><label>From</label><input type="date" id="sd" value="${state.startDate}" max="${state.endDate}"/></div>
+    <div class="date-group"><label>To</label><input type="date" id="ed" value="${state.endDate}" min="${state.startDate}"/></div>
+    <button class="btn btn-primary" ${state.loading?'disabled':''} onclick="handleRun()">${state.loading?'Loading…':'Run'}</button>
+    <button class="btn-config" onclick="toggleConfig()">${state.showConfig?'Hide config':'⚙ Config'}</button>
+    ${r?`<button class="btn btn-share" onclick="share()">⤴ Share</button>`:''}
+    <div class="user-chip">${state.user.picture?`<img src="${state.user.picture}" alt=""/>`:''}<span>${state.user.name||state.user.email}</span><button class="btn-so" onclick="signOut()">Sign out</button></div>
+  </div>
+  ${state.showConfig?rConfig():''}
+  ${state.error?`<div class="error-banner">⚠ ${state.error}</div>`:''}
+  ${state.loading?`<div id="loading"><div class="spinner"></div><div style="font-size:13px;color:var(--text2)">Querying GA4 (visitors + purchases)…</div></div>`:''}
+  ${r&&!state.loading?rDashboard(r):''}
+  ${!r&&!state.loading&&!state.error?`<div style="text-align:center;padding:60px 0;color:var(--text2)"><div style="font-size:32px;margin-bottom:12px">📅</div><div style="font-size:14px">Select a date range and click Run.</div><div style="font-size:12px;margin-top:6px;color:var(--text3)">Visitors: sessions on <strong>${state.config.landingPagePrefix}</strong> · Purchases: item_category = <strong>${state.config.itemCategory}</strong></div></div>`:''}
+  `;
+
+  document.getElementById('sd')?.addEventListener('change',e=>{state.startDate=e.target.value;});
+  document.getElementById('ed')?.addEventListener('change',e=>{state.endDate=e.target.value;});
+  if(r&&!state.loading){setTimeout(()=>renderChart(r.daily,state.activeTab),50);bindTabs();}
+}
+
+function bindTabs(){
+  document.querySelectorAll('.tab-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      state.activeTab=btn.dataset.tab;
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      if(state.results){
+        const cw=document.querySelector('.chart-wrap');
+        if(cw)cw.innerHTML=`<canvas id="metric-chart" role="img"></canvas>`;
+        const tw=document.querySelector('.table-scroll');
+        if(tw)tw.outerHTML=rTable(state.results,state.activeTab);
+        setTimeout(()=>renderChart(state.results.daily,state.activeTab),20);
+      }
+    });
+  });
+}
+
+function toggleConfig(){state.showConfig=!state.showConfig;render();}
+
+function handleRun(){
+  if(state.showConfig){
+    state.config={
+      propertyId:document.getElementById('c-pid')?.value||state.config.propertyId,
+      dimensionName:document.getElementById('c-dim')?.value||state.config.dimensionName,
+      variantValue:document.getElementById('c-var')?.value||state.config.variantValue,
+      controlValue:document.getElementById('c-con')?.value||state.config.controlValue,
+      landingPagePrefix:document.getElementById('c-lp')?.value||state.config.landingPagePrefix,
+      itemCategory:document.getElementById('c-ic')?.value||state.config.itemCategory,
+    };
+  }
+  state.startDate=document.getElementById('sd')?.value||state.startDate;
+  state.endDate=document.getElementById('ed')?.value||state.endDate;
+  runQuery();
+}
+
+window.addEventListener('load',()=>{
+  initDates();checkSharedUrl();
+  if(!state.isSharedView){const w=setInterval(()=>{if(window.google?.accounts?.oauth2){clearInterval(w);initGoogleAuth();}},100);}
+  render();
+});
+</script>
+</body>
+</html>
