@@ -377,6 +377,18 @@ export default function Home() {
       ].join('\n');
     });
 
+    // Wave-level rankings per plan
+    const waveRankings = cohortData
+      .filter(s => s.waves.some(w => w.acquisitionPct !== null))
+      .map(s => {
+        const validWaves = s.waves.filter(w => w.acquisitionPct !== null);
+        const byWaveAcqPct = [...validWaves].sort((a, b) => (b.acquisitionPct ?? 0) - (a.acquisitionPct ?? 0));
+        return [
+          `WAVE RANKINGS for ${s.planFull}:`,
+          ...byWaveAcqPct.map((w, i) => `  ${i + 1}. ${w.wave}: ${w.acquisitionPct}% acq rate (${w.acquisition} acq / ${w.trialists} trialists)`),
+        ].join('\n');
+      });
+
     const preComputedRankings = [
       `BEST ACQUISITION % overall (ranked 1st to last):`,
       ...byAcqPct.map((s, i) => `  ${i + 1}. ${s.planFull}: ${s.totals.acquisitionPct}% (${s.totals.acquisition} acquisitions / ${s.totals.trialists} trialists)`),
@@ -388,6 +400,8 @@ export default function Home() {
       ...byAcquisition.map((s, i) => `  ${i + 1}. ${s.planFull}: ${s.totals.acquisition} acquisitions`),
       ``,
       ...byPriceRankings,
+      ``,
+      ...waveRankings,
     ].join('\n');
 
     const isChartRequest = /chart|graph|plot/i.test(text);
@@ -461,7 +475,7 @@ export default function Home() {
       <div className="topbar">
         <div className="topbar-left">
           <div className="logo">CA</div>
-          <h1>Cohort Analysis Copilot V1</h1>
+          <h1>Cohort Analysis Copilot v1.1</h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {fileName && <div className="file-badge">{fileName}</div>}
