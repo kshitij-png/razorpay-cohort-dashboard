@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Papa from 'papaparse';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 // ── Types ──────────────────────────────────────────────────────
 type Row = Record<string, string>;
@@ -15,8 +15,8 @@ interface Sub { id: string; planId: string; planLabel: string; waves: Record<str
 interface ChartData {
   title: string;
   chart_type: 'bar' | 'line';
-  labels: string[];
-  values: number[];
+  x_labels: string[];
+  series: { name: string; values: number[] }[];
   y_axis_label: string;
 }
 
@@ -140,29 +140,41 @@ function renderMarkdown(text: string) {
   );
 }
 
+const CHART_COLORS = ['#2a5bd7', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899'];
+
 // ── Chart Block ────────────────────────────────────────────────
 function ChartBlock({ chart }: { chart: ChartData }) {
-  const data = chart.labels.map((label, i) => ({ name: label, value: chart.values[i] }));
+  const data = chart.x_labels.map((label, i) => {
+    const point: Record<string, string | number> = { name: label };
+    chart.series.forEach(s => { point[s.name] = s.values[i] ?? 0; });
+    return point;
+  });
+
+  const shared = { margin: { top: 8, right: 16, left: 0, bottom: 50 } };
+  const grid = <CartesianGrid strokeDasharray="3 3" stroke="var(--border2)" />;
+  const xAxis = <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--text2)' }} angle={-30} textAnchor="end" interval={0} />;
+  const yAxis = <YAxis tick={{ fontSize: 10, fill: 'var(--text2)' }} label={{ value: chart.y_axis_label, angle: -90, position: 'insideLeft', style: { fontSize: 10, fill: 'var(--text3)' } }} />;
+  const tooltip = <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border2)', borderRadius: 8, fontSize: 12 }} />;
+  const legend = <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />;
+
   return (
     <div className="chart-block">
       <div className="chart-title">{chart.title}</div>
-      <ResponsiveContainer width="100%" height={240}>
-        {chart.chart_type === 'bar' ? (
-          <BarChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 50 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border2)" />
-            <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--text2)' }} angle={-30} textAnchor="end" interval={0} />
-            <YAxis tick={{ fontSize: 10, fill: 'var(--text2)' }} label={{ value: chart.y_axis_label, angle: -90, position: 'insideLeft', style: { fontSize: 10, fill: 'var(--text3)' } }} />
-            <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border2)', borderRadius: 8, fontSize: 12 }} />
-            <Bar dataKey="value" fill="var(--accent)" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        ) : (
-          <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 50 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border2)" />
-            <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--text2)' }} angle={-30} textAnchor="end" interval={0} />
-            <YAxis tick={{ fontSize: 10, fill: 'var(--text2)' }} label={{ value: chart.y_axis_label, angle: -90, position: 'insideLeft', style: { fontSize: 10, fill: 'var(--text3)' } }} />
-            <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border2)', borderRadius: 8, fontSize: 12 }} />
-            <Line type="monotone" dataKey="value" stroke="var(--accent)" strokeWidth={2} dot={{ r: 3, fill: 'var(--accent)' }} />
+      <ResponsiveContainer width="100%" height={260}>
+        {chart.chart_type === 'line' ? (
+          <LineChart data={data} {...shared}>
+            {grid}{xAxis}{yAxis}{tooltip}{legend}
+            {chart.series.map((s, i) => (
+              <Line key={s.name} type="monotone" dataKey={s.name} stroke={CHART_COLORS[i % CHART_COLORS.length]} strokeWidth={2} dot={{ r: 3 }} />
+            ))}
           </LineChart>
+        ) : (
+          <BarChart data={data} {...shared}>
+            {grid}{xAxis}{yAxis}{tooltip}{legend}
+            {chart.series.map((s, i) => (
+              <Bar key={s.name} dataKey={s.name} fill={CHART_COLORS[i % CHART_COLORS.length]} radius={[4, 4, 0, 0]} />
+            ))}
+          </BarChart>
         )}
       </ResponsiveContainer>
     </div>
@@ -319,16 +331,64 @@ export default function Home() {
     setMessages(newMessages);
     setNlpLoading(true);
 
-    const cohortData = subs.map(s => ({
-      plan: s.planLabel.split(' — ₹')[0].trim() || 'All plans',
-      waves: Object.values(s.waves).map(w => ({
-        from: w.from, to: w.to,
+    const fmtDt = (dt: string) => {
+      if (!dt) return '';
+      const [d, t] = dt.split('T');
+      const [, m, day] = d.split('-');
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return `${parseInt(day)} ${months[parseInt(m)-1]}${t ? ' '+t : ''}`;
+    };
+
+    const cohortData = subs.map(s => {
+      const waves = Object.values(s.waves).map(w => ({
+        wave: `${fmtDt(w.from)} → ${fmtDt(w.to)}`,
         trialists: w.results?.trialists ?? null,
         acquisition: w.results?.acquisition ?? null,
         acquisitionPct: w.results && w.results.trialists > 0 ? pct(w.results.acquisition, w.results.trialists) : null,
         renewals: w.results?.renewals ?? null,
-      })),
-    }));
+      }));
+
+      const totalTrialists = waves.reduce((sum, w) => sum + (w.trialists ?? 0), 0);
+      const totalAcquisition = waves.reduce((sum, w) => sum + (w.acquisition ?? 0), 0);
+      const totalAcquisitionPct = totalTrialists > 0 ? pct(totalAcquisition, totalTrialists) : null;
+
+      return {
+        plan: s.planLabel.split(' — ₹')[0].trim() || 'All plans',
+        price: s.planLabel.includes('₹') ? '₹' + s.planLabel.split('₹')[1]?.trim() : null,
+        planFull: s.planLabel || 'All plans',
+        totals: { trialists: totalTrialists, acquisition: totalAcquisition, acquisitionPct: totalAcquisitionPct },
+        waves,
+      };
+    });
+
+    // Pre-compute plain-text answers the model reads directly
+    const withResults = cohortData.filter(s => s.totals.trialists > 0);
+    const byAcqPct = [...withResults].sort((a, b) => (b.totals.acquisitionPct ?? 0) - (a.totals.acquisitionPct ?? 0));
+    const byTrialists = [...withResults].sort((a, b) => b.totals.trialists - a.totals.trialists);
+    const byAcquisition = [...withResults].sort((a, b) => b.totals.acquisition - a.totals.acquisition);
+    // Group by price point for price-specific rankings
+    const pricePoints = [...new Set(withResults.map(s => s.price).filter(Boolean))];
+    const byPriceRankings = pricePoints.map(price => {
+      const plans = withResults.filter(s => s.price === price);
+      const ranked = [...plans].sort((a, b) => (b.totals.acquisitionPct ?? 0) - (a.totals.acquisitionPct ?? 0));
+      return [
+        `BEST ACQUISITION % among ${price} plans:`,
+        ...ranked.map((s, i) => `  ${i + 1}. ${s.planFull}: ${s.totals.acquisitionPct}% (${s.totals.acquisition} acq / ${s.totals.trialists} trialists)`),
+      ].join('\n');
+    });
+
+    const preComputedRankings = [
+      `BEST ACQUISITION % overall (ranked 1st to last):`,
+      ...byAcqPct.map((s, i) => `  ${i + 1}. ${s.planFull}: ${s.totals.acquisitionPct}% (${s.totals.acquisition} acquisitions / ${s.totals.trialists} trialists)`),
+      ``,
+      `MOST TRIALISTS overall (ranked 1st to last):`,
+      ...byTrialists.map((s, i) => `  ${i + 1}. ${s.planFull}: ${s.totals.trialists} trialists`),
+      ``,
+      `MOST ACQUISITIONS overall (ranked 1st to last):`,
+      ...byAcquisition.map((s, i) => `  ${i + 1}. ${s.planFull}: ${s.totals.acquisition} acquisitions`),
+      ``,
+      ...byPriceRankings,
+    ].join('\n');
 
     const isChartRequest = /chart|graph|plot/i.test(text);
 
@@ -345,7 +405,7 @@ export default function Home() {
         const res = await fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ question: text, cohortData, history: messages }),
+          body: JSON.stringify({ question: text, cohortData, rankings: preComputedRankings, history: isFirst ? [] : messages }),
         });
         const data = await res.json();
         const answer = isFirst ? 'Namaste 🙏\n\n' + (data.answer ?? '') : (data.answer ?? '');
@@ -478,9 +538,9 @@ export default function Home() {
                       <div className="nlp-msg-content nlp-thinking">
                         Pandit ji soch rahe hai
                         <span className="thinking-dots">
-                          <span className="dot">.</span>
-                          <span className="dot">.</span>
-                          <span className="dot">.</span>
+                          <span className="dot"></span>
+                          <span className="dot"></span>
+                          <span className="dot"></span>
                         </span>
                       </div>
                     </div>

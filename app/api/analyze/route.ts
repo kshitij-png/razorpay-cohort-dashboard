@@ -4,14 +4,25 @@ import OpenAI from 'openai';
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function POST(req: NextRequest) {
-  const { question, cohortData, history } = await req.json();
+  const { question, cohortData, rankings, history } = await req.json();
 
-  const context = JSON.stringify(cohortData, null, 2);
+  // Build a clean readable table the model can't misinterpret
+  const plansTable = (cohortData as any[]).map((s: any) =>
+    `${s.planFull} | Trialists: ${s.totals.trialists} | Acquisitions: ${s.totals.acquisition} | Acq%: ${s.totals.acquisitionPct}%`
+  ).join('\n');
+
+  const waveDetail = (cohortData as any[]).map((s: any) =>
+    `\n${s.planFull}:\n` + s.waves.map((w: any) =>
+      `  ${w.wave} → Trialists: ${w.trialists ?? '—'}, Acquisitions: ${w.acquisition ?? '—'}, Acq%: ${w.acquisitionPct ?? '—'}%`
+    ).join('\n')
+  ).join('\n');
+
+  const rankingsContext = rankings as string;
 
   const input = [
     {
       role: 'user' as const,
-      content: `Here is the current cohort data for reference:\n${context}`,
+      content: `=== PLAN TOTALS — USE THESE EXACT NUMBERS, DO NOT RECALCULATE ===\n${plansTable}\n\n=== RANKINGS — AUTHORITATIVE, DO NOT REORDER OR RECALCULATE ===\n${rankingsContext}\n\n=== WAVE-LEVEL DETAIL (for specific wave questions only) ===\n${waveDetail}`,
     },
     {
       role: 'assistant' as const,
@@ -25,7 +36,7 @@ export async function POST(req: NextRequest) {
   ];
 
   const response = await openai.responses.create({
-    model: 'gpt-4o-mini',
+    model: 'gpt-4o',
     tools: [
       { type: 'web_search_preview' as const },
     ],
@@ -40,11 +51,26 @@ Your job is to help users understand their cohort and acquisition data by connec
 ## Metric Definitions
 - Trialists: users who started a free trial (authenticated_at is set)
 - Acquisition: trialists who made their first payment (paid_count >= 1)
-- Acquisition %: conversion rate from trial to paid
+- Acquisition %: conversion rate from trial to paid — this is the PRIMARY performance metric. A plan with fewer trialists but a higher acquisition % is performing better than one with more trialists but a lower %. Never rank plans by raw acquisition count alone.
 - Renewals: subsequent payments (R1 = paid_count >= 2, R2 = paid_count >= 3, etc.)
 
+When asked which plan is "most successful", "best performing", "doing best", or similar — always rank by acquisition % from the "totals" field, not by raw acquisition numbers.
+
+## Working with numbers
+- Pre-computed rankings are provided alongside the cohort data. For any ranking or comparison question (best, worst, highest, lowest, most successful) always read directly from these rankings — never recalculate.
+- Each plan in the cohort data has a "totals" field with pre-calculated sums across all waves. Always use these totals for overall performance — never calculate totals yourself by averaging wave percentages.
+- Each plan also has a "price" field and a "planFull" field — use these to distinguish between price points of the same plan.
+- Wave-level numbers are in the "waves" array with a "wave" label showing the date range.
+
 ## Your Core Behavior
-When a user asks about performance in a date range, follow these steps in strict order. You are not allowed to skip any step or answer before completing all steps.
+
+First, determine the intent of the question:
+
+TYPE A — Data question: asking for numbers, performance, comparisons, totals, rankings (e.g. "how did X do overall", "which plan had the best acquisition", "compare price points", "what were the numbers for X"). For TYPE A: answer directly from the cohort data provided. Do NOT search for tithis. Do NOT fetch any URL.
+
+TYPE B — Context/events question: asking what happened during a period, what events or festivals coincided, what caused a spike or drop (e.g. "what happened in April 1-9", "were there any festivals during this wave", "what was going on in this period"). For TYPE B: follow the steps below.
+
+When the question is TYPE B, follow these steps in strict order. You are not allowed to skip any step or answer before completing all steps.
 
 STEP 1 — YOU MUST FETCH DRIKPANCHANG BEFORE WRITING A SINGLE WORD OF YOUR ANSWER. Extract the month(s) and year from the date range. Construct the URL: https://www.drikpanchang.com/festivals/month/festivals-[month].html?year=[year]. For April 2026 that is https://www.drikpanchang.com/festivals/month/festivals-april.html?year=2026. If the range spans two months construct both URLs and fetch both. Use your web search tool to fetch these URLs right now before proceeding.
 
