@@ -194,6 +194,7 @@ export default function Home() {
   const [nlpLoading, setNlpLoading] = useState(false);
   const [darkMode, setDarkMode] = useState<'light' | 'dark' | null>(null);
   const [copied, setCopied] = useState<number | null>(null);
+  const [rudraOpen, setRudraOpen] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const nlpInputRef = useRef<HTMLInputElement>(null);
   const nlpFocused = useRef(false);
@@ -515,81 +516,93 @@ export default function Home() {
         {hasData && (
           <>
             {/* ── Rudra AI ── */}
-            <div className="nlp-section">
-              <div className="nlp-header">
-                <div className="nlp-header-left">
-                  <img src="/rudra.png" alt="Rudra" className="rudra-avatar" />
-                  <div>
-                    <div className="nlp-title">Rudra AI — Ask me anything about your data 🙏</div>
-                    <div className="nlp-sub">Click any wave row while typing to insert it. For date-range questions, Hindu calendar events are checked automatically.</div>
+            {!rudraOpen && (
+              <button className="rudra-pill" onClick={() => setRudraOpen(true)}>
+                <img src="/rudra.png" alt="Rudra" className="rudra-avatar" />
+                <div className="rudra-inline-bubble">Namaste! Ask me about your data 🙏</div>
+              </button>
+            )}
+
+            {rudraOpen && (
+              <div className="nlp-section">
+                <div className="nlp-header">
+                  <div className="nlp-header-left">
+                    <img src="/rudra.png" alt="Rudra" className="rudra-avatar" />
+                    <div>
+                      <div className="nlp-title">Rudra AI — Ask me anything about your data 🙏</div>
+                      <div className="nlp-sub">Click any wave row while typing to insert it. Hindu calendar events checked automatically.</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    {messages.length > 0 && (
+                      <button className="nlp-clear-btn" onClick={() => setMessages([])}>Clear</button>
+                    )}
+                    <button className="nlp-clear-btn" style={{ background: 'none', color: 'var(--text3)', border: '1px solid var(--border2)' }} onClick={() => setRudraOpen(false)}>×</button>
                   </div>
                 </div>
+
                 {messages.length > 0 && (
-                  <button className="nlp-clear-btn" onClick={() => setMessages([])}>Clear</button>
+                  <div className="nlp-messages" ref={messagesContainerRef}>
+                    {messages.map((m, i) => (
+                      <div key={i} className={`nlp-msg nlp-msg-${m.role}`}>
+                        <div className="nlp-msg-label">
+                          {m.role === 'user' ? 'You' : '🪔 Rudra AI'}
+                        </div>
+                        <div className="nlp-msg-content">
+                          {m.chart ? <ChartBlock chart={m.chart} /> : (m.role === 'assistant' ? renderMarkdown(m.content) : m.content)}
+                        </div>
+                        {m.role === 'assistant' && (
+                          <button className="copy-btn" onClick={() => copyMessage(m.content, i)}>
+                            {copied === i ? '✓ Copied' : 'Copy'}
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    {nlpLoading && (
+                      <div className="nlp-msg nlp-msg-assistant">
+                        <div className="nlp-msg-label">🪔 Rudra AI</div>
+                        <div className="nlp-msg-content nlp-thinking">
+                          Pandit ji soch rahe hai
+                          <span className="thinking-dots">
+                            <span className="dot"></span>
+                            <span className="dot"></span>
+                            <span className="dot"></span>
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
-              </div>
 
-              {messages.length > 0 && (
-                <div className="nlp-messages" ref={messagesContainerRef}>
-                  {messages.map((m, i) => (
-                    <div key={i} className={`nlp-msg nlp-msg-${m.role}`}>
-                      <div className="nlp-msg-label">
-                        {m.role === 'user' ? 'You' : '🪔 Rudra AI'}
-                      </div>
-                      <div className="nlp-msg-content">
-                        {m.chart ? <ChartBlock chart={m.chart} /> : (m.role === 'assistant' ? renderMarkdown(m.content) : m.content)}
-                      </div>
-                      {m.role === 'assistant' && (
-                        <button className="copy-btn" onClick={() => copyMessage(m.content, i)}>
-                          {copied === i ? '✓ Copied' : 'Copy'}
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  {nlpLoading && (
-                    <div className="nlp-msg nlp-msg-assistant">
-                      <div className="nlp-msg-label">🪔 Rudra AI</div>
-                      <div className="nlp-msg-content nlp-thinking">
-                        Pandit ji soch rahe hai
-                        <span className="thinking-dots">
-                          <span className="dot"></span>
-                          <span className="dot"></span>
-                          <span className="dot"></span>
-                        </span>
-                      </div>
-                    </div>
-                  )}
+                {messages.length === 0 && (
+                  <div className="suggested-questions">
+                    {SUGGESTED_QUESTIONS.map((sq, i) => (
+                      <button key={i} className="suggested-chip" onClick={() => handleAsk(sq)}>
+                        {sq}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <div className="nlp-input-row">
+                  <input
+                    ref={nlpInputRef}
+                    className="nlp-input"
+                    type="text"
+                    placeholder="Ask Rudra AI anything about your cohorts…"
+                    value={question}
+                    onChange={e => setQuestion(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAsk(); } }}
+                    onFocus={() => { nlpFocused.current = true; }}
+                    onBlur={() => { nlpFocused.current = false; }}
+                    disabled={nlpLoading}
+                  />
+                  <button className="nlp-send-btn" onClick={() => handleAsk()} disabled={nlpLoading || !question.trim()}>
+                    {nlpLoading ? '…' : 'Ask'}
+                  </button>
                 </div>
-              )}
-
-              {messages.length === 0 && (
-                <div className="suggested-questions">
-                  {SUGGESTED_QUESTIONS.map((sq, i) => (
-                    <button key={i} className="suggested-chip" onClick={() => handleAsk(sq)}>
-                      {sq}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              <div className="nlp-input-row">
-                <input
-                  ref={nlpInputRef}
-                  className="nlp-input"
-                  type="text"
-                  placeholder="Ask Rudra AI anything about your cohorts…"
-                  value={question}
-                  onChange={e => setQuestion(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAsk(); } }}
-                  onFocus={() => { nlpFocused.current = true; }}
-                  onBlur={() => { nlpFocused.current = false; }}
-                  disabled={nlpLoading}
-                />
-                <button className="nlp-send-btn" onClick={() => handleAsk()} disabled={nlpLoading || !question.trim()}>
-                  {nlpLoading ? '…' : 'Ask'}
-                </button>
               </div>
-            </div>
+            )}
 
             <div className="subs-gap" />
 
