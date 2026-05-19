@@ -373,14 +373,23 @@ export default function Home() {
       return `${parseInt(day)} ${months[parseInt(m)-1]}${t ? ' '+t : ''}`;
     };
 
+    const nlpToday = new Date();
+    nlpToday.setHours(23, 59, 59, 999);
+
     const cohortData = subs.map(s => {
-      const waves = Object.values(s.waves).map(w => ({
-        wave: `${fmtDt(w.from)} → ${fmtDt(w.to)}`,
-        trialists: w.results?.trialists ?? null,
-        acquisition: w.results?.acquisition ?? null,
-        acquisitionPct: w.results && w.results.trialists > 0 ? pct(w.results.acquisition, w.results.trialists) : null,
-        renewals: w.results?.renewals ?? null,
-      }));
+      const waves = Object.values(s.waves)
+        .filter(w => {
+          if (w.to && new Date(w.to) > nlpToday) return false;
+          if (w.results && w.results.trialists === 0 && w.results.acquisition === 0) return false;
+          return true;
+        })
+        .map(w => ({
+          wave: `${fmtDt(w.from)} → ${fmtDt(w.to)}`,
+          trialists: w.results?.trialists ?? null,
+          acquisition: w.results?.acquisition ?? null,
+          acquisitionPct: w.results && w.results.trialists > 0 ? pct(w.results.acquisition, w.results.trialists) : null,
+          renewals: w.results?.renewals ?? null,
+        }));
 
       const totalTrialists = waves.reduce((sum, w) => sum + (w.trialists ?? 0), 0);
       const totalAcquisition = waves.reduce((sum, w) => sum + (w.acquisition ?? 0), 0);
@@ -423,6 +432,18 @@ export default function Home() {
         ].join('\n');
       });
 
+    // Cross-plan wave rankings — all plan+wave combinations ranked by acq %
+    const allWaveRows: { plan: string; wave: string; acquisitionPct: number; acquisition: number; trialists: number }[] = [];
+    cohortData.forEach(s => {
+      s.waves.forEach(w => {
+        if (w.acquisitionPct !== null && w.trialists !== null && w.acquisition !== null) {
+          allWaveRows.push({ plan: s.planFull, wave: w.wave, acquisitionPct: w.acquisitionPct!, acquisition: w.acquisition!, trialists: w.trialists! });
+        }
+      });
+    });
+    const topWavesByAcqPct = [...allWaveRows].sort((a, b) => b.acquisitionPct - a.acquisitionPct);
+    const topWavesByTrialists = [...allWaveRows].sort((a, b) => b.trialists - a.trialists);
+
     const preComputedRankings = [
       `BEST ACQUISITION % overall (ranked 1st to last):`,
       ...byAcqPct.map((s, i) => `  ${i + 1}. ${s.planFull}: ${s.totals.acquisitionPct}% (${s.totals.acquisition} acquisitions / ${s.totals.trialists} trialists)`),
@@ -436,6 +457,12 @@ export default function Home() {
       ...byPriceRankings,
       ``,
       ...waveRankings,
+      ``,
+      `BEST WAVES ACROSS ALL PLANS — ranked by acquisition % (pre-computed, do not recalculate):`,
+      ...topWavesByAcqPct.map((r, i) => `  ${i + 1}. ${r.plan} | ${r.wave}: ${r.acquisitionPct}% acq rate (${r.acquisition} acq / ${r.trialists} trialists)`),
+      ``,
+      `MOST TRIALISTS ACROSS ALL WAVES — ranked by trialist count (pre-computed, do not recalculate):`,
+      ...topWavesByTrialists.map((r, i) => `  ${i + 1}. ${r.plan} | ${r.wave}: ${r.trialists} trialists`),
     ].join('\n');
 
     const isChartRequest = /chart|graph|plot/i.test(text);
