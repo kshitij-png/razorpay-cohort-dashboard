@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { APP_TITLE } from "@/lib/config";
 
 export const metadata: Metadata = {
-  title: "Cohort Analysis Copilot v1.1",
+  title: APP_TITLE,
   description: "Subscription cohort analysis powered by Rudra AI — understand your trialists, acquisitions and renewals with Hindu calendar context.",
   openGraph: {
-    title: "Cohort Analysis Copilot v1.1",
+    title: APP_TITLE,
     description: "Subscription cohort analysis powered by Rudra AI",
     type: "website",
   },

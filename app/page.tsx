@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { APP_TITLE } from '@/lib/config';
 import Papa from 'papaparse';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
@@ -536,7 +537,7 @@ export default function Home() {
       <div className="topbar">
         <div className="topbar-left">
           <div className="logo">CA</div>
-          <h1>Cohort Analysis Copilot v1.2</h1>
+          <h1>{APP_TITLE}</h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {fileName && <div className="file-badge">{fileName}</div>}
