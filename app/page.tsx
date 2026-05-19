@@ -10,7 +10,7 @@ type Row = Record<string, string>;
 interface PlanOption { id: string; name: string; amount: number; label: string; }
 interface WaveResult { trialists: number; acquisition: number; renewals: Record<number, number>; maxPaid: number; }
 interface Wave { from: string; to: string; results: WaveResult | null; }
-interface Sub { id: string; planId: string; planLabel: string; waves: Record<string, Wave>; }
+interface Sub { id: string; planId: string; planLabel: string; group: string; waves: Record<string, Wave>; }
 
 interface ChartData {
   title: string;
@@ -93,38 +93,25 @@ function buildPlanOptions(data: Row[]) {
   return { options, map };
 }
 
-function getPresetWaves(label: string) {
-  const l = label.toLowerCase();
-  if (l.includes('khatu shyam')) return [
-    { from: '2026-04-01T16:00', to: '2026-04-09T16:00' },
-    { from: '2026-04-09T16:00', to: '2026-04-16T16:00' },
-    { from: '2026-04-16T16:00', to: '2026-04-19T16:00' },
-    { from: '2026-04-19T16:00', to: '2026-04-23T16:00' },
-  ];
-  if (l.includes('gau seva')) return [
-    { from: '2026-04-01T16:00', to: '2026-04-15T16:00' },
-    { from: '2026-04-15T16:00', to: '2026-04-19T16:00' },
-    { from: '2026-04-19T16:00', to: '2026-04-22T16:00' },
-  ];
-  if (l.includes('rin mukti')) return [
-    { from: '2026-04-01T12:00', to: '2026-04-13T12:00' },
-    { from: '2026-04-13T12:00', to: '2026-04-20T12:00' },
-  ];
-  if (l.includes('pashupatinath')) return [{ from: '2026-04-01T12:00', to: '2026-04-20T12:00' }];
-  return null;
-}
-
 const PRESET_PLANS = [
-  { name: 'Khatu Shyam Ji Chadhava', amount: 501 },
-  { name: 'Khatu Shyam Ji Chadhava', amount: 301 },
-  { name: 'Khatu Shyam Ji Chadhava', amount: 151 },
-  { name: 'Rin Mukti Chadhava', amount: 501 },
-  { name: 'Rin Mukti Chadhava', amount: 301 },
-  { name: 'Rin Mukti Chadhava', amount: 151 },
-  { name: 'Gau Seva', amount: 501 },
-  { name: 'Gau Seva', amount: 301 },
-  { name: 'Gau Seva', amount: 151 },
-  { name: 'Pashupatinath Vishesh: Sarva Rog Nivaran Chadhava', amount: 501 },
+  { id: 'plan_SpXTGxYrOAtabr', name: 'Khatu Shyam Ji Chadhava', amount: 701, group: 'khatu-shyam' },
+  { id: 'plan_SadHlOrofce21M', name: 'Khatu Shyam Ji Chadhava', amount: 501, group: 'khatu-shyam' },
+  { id: 'plan_SYd6GOYMPqAfW9', name: 'Khatu Shyam Ji Chadhava', amount: 301, group: 'khatu-shyam' },
+  { id: 'plan_SYX8KYFBKJceg3', name: 'Khatu Shyam Ji Chadhava', amount: 151, group: 'khatu-shyam' },
+  { id: 'plan_SlffmutfAz3QwN', name: 'Rin Mukti Chadhava', amount: 701, group: 'rin-mukti' },
+  { id: 'plan_SacIQgNmBwShxR', name: 'Rin Mukti Chadhava', amount: 501, group: 'rin-mukti' },
+  { id: 'plan_SYcXKx0TTukino', name: 'Rin Mukti Chadhava', amount: 301, group: 'rin-mukti' },
+  { id: 'plan_SYXZuHSpVpc4hg', name: 'Rin Mukti Chadhava', amount: 151, group: 'rin-mukti' },
+  { id: 'plan_Slgt5MRn7pD7Jf', name: 'Gau Seva', amount: 701, group: 'gau-seva' },
+  { id: 'plan_SbhlN0ddOwzavP', name: 'Gau Seva', amount: 501, group: 'gau-seva' },
+  { id: 'plan_SbntpkIR9dPfg3', name: 'Gau Seva', amount: 301, group: 'gau-seva' },
+  { id: 'plan_SbnqAiJ3tv0Mev', name: 'Gau Seva', amount: 151, group: 'gau-seva' },
+  { id: 'plan_SpXqwauIo6D3FW', name: 'Pashupatinath Vishesh: Sarva Rog Nivaran Chadhava', amount: 701, group: 'pashupatinath' },
+  { id: 'plan_Se3uiLDNg9wBQ9', name: 'Pashupatinath Vishesh: Sarva Rog Nivaran Chadhava', amount: 501, group: 'pashupatinath' },
+  { id: 'plan_SpGFawuRqIVV9F', name: 'Pashupatinath Vishesh: Sarva Rog Nivaran Chadhava', amount: 301, group: 'pashupatinath' },
+  { id: 'plan_SpFwoZfg4ILRCa', name: 'Vaanar Seva', amount: 701, group: 'vaanar-seva' },
+  { id: 'plan_Sbi1eCwpOWmbQy', name: 'Vaanar Seva', amount: 501, group: 'vaanar-seva' },
+  { id: 'plan_SbnPhAAsIfCNal', name: 'Vaanar Seva', amount: 301, group: 'vaanar-seva' },
 ];
 
 const SUGGESTED_QUESTIONS = [
@@ -195,6 +182,7 @@ export default function Home() {
   const [darkMode, setDarkMode] = useState<'light' | 'dark' | null>(null);
   const [copied, setCopied] = useState<number | null>(null);
   const [rudraOpen, setRudraOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const nlpInputRef = useRef<HTMLInputElement>(null);
   const nlpFocused = useRef(false);
@@ -233,18 +221,18 @@ export default function Home() {
         setPlanMap(map);
         setHasData(true);
         const newSubs: Sub[] = [];
+        const groupWaveIds: Record<string, string> = {};
         PRESET_PLANS.forEach(preset => {
           const keyword = preset.name.toLowerCase().split(':')[0].trim();
-          const match = options.find(p => p.name.toLowerCase().includes(keyword) && p.amount === preset.amount);
+          const match = options.find(p => p.id === preset.id || (p.name.toLowerCase().includes(keyword) && p.amount === preset.amount));
           if (match) {
-            const presets = getPresetWaves(match.label);
-            const waves: Record<string, Wave> = {};
-            if (presets) presets.forEach(p => { const wid = uid(); waves[wid] = { from: p.from, to: p.to, results: calcWaveResults(data, match.id, p.from, p.to) }; });
-            else waves[uid()] = { from: '', to: '', results: null };
-            newSubs.push({ id: uid(), planId: match.id, planLabel: match.label, waves });
+            if (!groupWaveIds[preset.group]) groupWaveIds[preset.group] = uid();
+            const wid = groupWaveIds[preset.group];
+            const waves: Record<string, Wave> = { [wid]: { from: '', to: '', results: null } };
+            newSubs.push({ id: uid(), planId: match.id, planLabel: match.label, group: preset.group, waves });
           }
         });
-        if (newSubs.length === 0) newSubs.push({ id: uid(), planId: '', planLabel: '', waves: { [uid()]: { from: '', to: '', results: null } } });
+        if (newSubs.length === 0) newSubs.push({ id: uid(), planId: '', planLabel: '', group: '', waves: { [uid()]: { from: '', to: '', results: null } } });
         setSubs(newSubs);
       },
       error() { alert('Error reading file.'); }
@@ -257,56 +245,101 @@ export default function Home() {
     const waves: Record<string, Wave> = lastSub
       ? Object.fromEntries(Object.values(lastSub.waves).map(w => [uid(), { from: w.from, to: w.to, results: null }]))
       : { [uid()]: { from: '', to: '', results: null } };
-    setSubs(prev => [...prev, { id: uid(), planId: '', planLabel: '', waves }]);
+    setSubs(prev => [...prev, { id: uid(), planId: '', planLabel: '', group: '', waves }]);
   }
 
   function removeSub(subId: string) { setSubs(prev => prev.filter(s => s.id !== subId)); }
 
+  async function syncFromCalendar() {
+    setSyncing(true);
+    try {
+      const res = await fetch('/api/waves');
+      if (!res.ok) throw new Error('Failed to fetch calendar');
+      const data: Record<string, { from: string; to: string }[]> = await res.json();
+
+      // Pre-generate shared wave IDs per group so siblings stay in sync
+      const groupWaveIds: Record<string, string[]> = {};
+      for (const [group, waves] of Object.entries(data)) {
+        groupWaveIds[group] = waves.map(() => uid());
+      }
+
+      setSubs(prev => prev.map(s => {
+        if (!s.group || !data[s.group]) return s;
+        const waves = data[s.group];
+        const wids = groupWaveIds[s.group];
+        const newWaves: Record<string, Wave> = {};
+        waves.forEach((w, i) => {
+          newWaves[wids[i]] = {
+            from: w.from,
+            to: w.to,
+            results: calcWaveResults(allData, s.planId, w.from, w.to),
+          };
+        });
+        return { ...s, waves: newWaves };
+      }));
+    } catch (e) {
+      alert('Could not sync from calendar. Check your internet connection and try again.');
+      console.error(e);
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   function selectPlan(subId: string, planId: string, planLabel: string) {
     setSubs(prev => prev.map(s => {
       if (s.id !== subId) return s;
-      let waves = s.waves;
-      if (planId) {
-        const presets = getPresetWaves(planLabel);
-        if (presets) {
-          const nw: Record<string, Wave> = {};
-          presets.forEach(p => { const wid = uid(); nw[wid] = { from: p.from, to: p.to, results: calcWaveResults(allData, planId, p.from, p.to) }; });
-          waves = nw;
-        } else {
-          waves = Object.fromEntries(Object.entries(s.waves).map(([wid, w]) => [wid, { ...w, results: calcWaveResults(allData, planId, w.from, w.to) }]));
-        }
-      }
+      const waves = planId
+        ? Object.fromEntries(Object.entries(s.waves).map(([wid, w]) => [wid, { ...w, results: calcWaveResults(allData, planId, w.from, w.to) }]))
+        : s.waves;
       return { ...s, planId, planLabel, waves };
     }));
   }
 
   function addWave(subId: string) {
-    setSubs(prev => prev.map(s => {
-      if (s.id !== subId) return s;
-      const existing = Object.values(s.waves);
-      const lastTo = existing.length > 0 ? existing[existing.length - 1].to : '';
+    setSubs(prev => {
+      const source = prev.find(s => s.id === subId);
+      if (!source) return prev;
       const wid = uid();
-      return { ...s, waves: { ...s.waves, [wid]: { from: lastTo, to: '', results: null } } };
-    }));
+      return prev.map(s => {
+        if (s.id === subId || (source.group && s.group === source.group)) {
+          const lastTo = Object.values(s.waves).slice(-1)[0]?.to || '';
+          return { ...s, waves: { ...s.waves, [wid]: { from: lastTo, to: '', results: null } } };
+        }
+        return s;
+      });
+    });
   }
 
   function removeWave(subId: string, waveId: string) {
-    setSubs(prev => prev.map(s => {
-      if (s.id !== subId) return s;
-      const updated = { ...s.waves };
-      delete updated[waveId];
-      return { ...s, waves: updated };
-    }));
+    setSubs(prev => {
+      const source = prev.find(s => s.id === subId);
+      if (!source) return prev;
+      return prev.map(s => {
+        if (s.id === subId || (source.group && s.group === source.group)) {
+          const updated = { ...s.waves };
+          delete updated[waveId];
+          return { ...s, waves: updated };
+        }
+        return s;
+      });
+    });
   }
 
   function updateWave(subId: string, waveId: string, field: 'from' | 'to', val: string) {
-    setSubs(prev => prev.map(s => {
-      if (s.id !== subId) return s;
-      const w = s.waves[waveId];
-      const updated = { ...w, [field]: val };
-      updated.results = calcWaveResults(allData, s.planId, updated.from, updated.to);
-      return { ...s, waves: { ...s.waves, [waveId]: updated } };
-    }));
+    setSubs(prev => {
+      const source = prev.find(s => s.id === subId);
+      if (!source) return prev;
+      return prev.map(s => {
+        if (s.id === subId || (source.group && s.group === source.group && s.waves[waveId])) {
+          const w = s.waves[waveId];
+          if (!w) return s;
+          const updated = { ...w, [field]: val };
+          updated.results = calcWaveResults(allData, s.planId, updated.from, updated.to);
+          return { ...s, waves: { ...s.waves, [waveId]: updated } };
+        }
+        return s;
+      });
+    });
   }
 
   // ── NLP ────────────────────────────────────────────────────
@@ -476,12 +509,15 @@ export default function Home() {
       <div className="topbar">
         <div className="topbar-left">
           <div className="logo">CA</div>
-          <h1>Cohort Analysis Copilot v1.1</h1>
+          <h1>Cohort Analysis Copilot v1.2</h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {fileName && <div className="file-badge">{fileName}</div>}
           {hasData && (
             <>
+              <button className="export-action-btn" onClick={syncFromCalendar} disabled={syncing}>
+                {syncing ? 'Syncing…' : '📅 Sync from Tracker'}
+              </button>
               <button className="export-action-btn" onClick={() => window.print()}>Export PDF</button>
               <button className="export-action-btn" onClick={exportCSV}>Download CSV</button>
             </>
@@ -668,7 +704,13 @@ function SubBlock({ sub, idx, planOptions, onSelectPlan, onRemove, onAddWave, on
     ? planOptions.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) || String(p.amount).includes(search))
     : planOptions;
 
-  const waves = Object.entries(sub.waves);
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  const waves = Object.entries(sub.waves).filter(([, w]) => {
+    if (w.to && new Date(w.to) > today) return false;
+    if (w.results && w.results.trialists === 0 && w.results.acquisition === 0) return false;
+    return true;
+  });
   const maxR = Math.max(0, ...waves.map(([, w]) => w.results ? w.results.maxPaid - 1 : 0));
 
   let sumTrialists = 0, sumAcq = 0;
