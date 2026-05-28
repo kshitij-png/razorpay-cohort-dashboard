@@ -184,6 +184,7 @@ export default function Home() {
   const [copied, setCopied] = useState<number | null>(null);
   const [rudraOpen, setRudraOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [expandAllKey, setExpandAllKey] = useState(0);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const nlpInputRef = useRef<HTMLInputElement>(null);
   const nlpFocused = useRef(false);
@@ -536,7 +537,7 @@ export default function Home() {
     <>
       <div className="topbar">
         <div className="topbar-left">
-          <div className="logo">CA</div>
+          <div className="logo" onClick={() => setExpandAllKey(k => k + 1)}>CA</div>
           <h1>{APP_TITLE}</h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -579,6 +580,18 @@ export default function Home() {
 
         {hasData && (
           <>
+            {/* ── PDF Report Header (print-only) ── */}
+            <div className="pdf-report-header print-only">
+              <div className="pdf-report-left">
+                <div className="pdf-report-title">Subscription Cohort Analysis</div>
+                <div className="pdf-report-subtitle">
+                  Generated: {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  {fileName ? `  ·  ${fileName}` : ''}
+                </div>
+              </div>
+              <img src="/lifeguru-logo.png" alt="LifeGuru Mandir Puja" className="pdf-report-logo" />
+            </div>
+
             {/* ── Rudra AI ── */}
             {!rudraOpen && (
               <button className="rudra-pill" onClick={() => setRudraOpen(true)}>
@@ -684,6 +697,7 @@ export default function Home() {
                 onUpdateWave={(wid, field, val) => updateWave(sub.id, wid, field, val)}
                 nlpFocused={nlpFocused}
                 onWaveClick={(planName, from, to) => insertAtCursor(`${planName}, ${from} to ${to}`)}
+                expandAllKey={expandAllKey}
               />
             ))}
 
@@ -696,7 +710,7 @@ export default function Home() {
 }
 
 // ── SubBlock ───────────────────────────────────────────────────
-function SubBlock({ sub, idx, planOptions, onSelectPlan, onRemove, onAddWave, onRemoveWave, onUpdateWave, nlpFocused, onWaveClick }: {
+function SubBlock({ sub, idx, planOptions, onSelectPlan, onRemove, onAddWave, onRemoveWave, onUpdateWave, nlpFocused, onWaveClick, expandAllKey }: {
   sub: Sub; idx: number;
   planOptions: PlanOption[];
   planMap: Record<string, PlanOption>;
@@ -706,9 +720,14 @@ function SubBlock({ sub, idx, planOptions, onSelectPlan, onRemove, onAddWave, on
   onUpdateWave: (wid: string, field: 'from' | 'to', val: string) => void;
   nlpFocused: React.RefObject<boolean>;
   onWaveClick: (planName: string, from: string, to: string) => void;
+  expandAllKey: number;
 }) {
   const [search, setSearch] = useState(sub.planLabel);
   const [ddOpen, setDdOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+
+  // When the parent fires "expand all" (key increments), reset to expanded
+  useEffect(() => { if (expandAllKey > 0) setCollapsed(false); }, [expandAllKey]);
 
   useEffect(() => { setSearch(sub.planLabel); }, [sub.planLabel]);
 
@@ -755,9 +774,12 @@ function SubBlock({ sub, idx, planOptions, onSelectPlan, onRemove, onAddWave, on
   const renewalCols = Array.from({ length: maxR }, (_, i) => i + 1);
 
   return (
-    <div className="sub-block">
+    <div className={`sub-block${collapsed ? ' collapsed' : ''}`}>
       <div className="sub-header">
+        <button className="sub-collapse-btn" onClick={() => setCollapsed(c => !c)}>▼</button>
         <div className="sub-num">{idx + 1}</div>
+        {/* Print-only: plain text plan name — the input is hidden in print so we show this instead */}
+        <span className="print-plan-name print-only">{sub.planLabel || 'All plans'}</span>
         <div className="sub-plan-wrap">
           <input
             type="text"
@@ -783,6 +805,23 @@ function SubBlock({ sub, idx, planOptions, onSelectPlan, onRemove, onAddWave, on
         <button className="remove-sub-btn" onClick={onRemove}>×</button>
       </div>
 
+      {/* Collapsed summary — only visible when block is collapsed */}
+      {hasAnyResult && (
+        <div className="collapsed-summary">
+          <span className="collapsed-stat"><strong>{sumTrialists.toLocaleString()}</strong> trialists</span>
+          <span className="collapsed-divider">·</span>
+          <span className="collapsed-stat"><strong>{sumAcq.toLocaleString()}</strong> acquired</span>
+          <span className="collapsed-divider">·</span>
+          <span className="collapsed-stat"><strong style={{ color: 'var(--accent-text)' }}>{sumTrialists > 0 ? pct(sumAcq, sumTrialists) : 0}%</strong> acq rate</span>
+          {Object.keys(sumR).length > 0 && (
+            <>
+              <span className="collapsed-divider">·</span>
+              <span className="collapsed-stat"><strong>{sumR[1]?.toLocaleString() ?? 0}</strong> R1 renewals</span>
+            </>
+          )}
+        </div>
+      )}
+
       <div className="waves-wrap">
         <div className="waves-table-scroll">
           <table className="waves-table">
@@ -805,8 +844,15 @@ function SubBlock({ sub, idx, planOptions, onSelectPlan, onRemove, onAddWave, on
                 const acqPct = res && res.trialists > 0 ? pct(res.acquisition, res.trialists) : null;
                 return (
                   <tr key={wid} onMouseDown={() => handleRowMouseDown(w)} style={{ cursor: 'default' }}>
-                    <td><input type="datetime-local" className="wave-input" value={w.from} onChange={e => onUpdateWave(wid, 'from', e.target.value)} /></td>
-                    <td><input type="datetime-local" className="wave-input" value={w.to} onChange={e => onUpdateWave(wid, 'to', e.target.value)} /></td>
+                    <td>
+                      {/* Browser: shows datetime picker. Print: picker hidden, span shown instead */}
+                      <input type="datetime-local" className="wave-input" value={w.from} onChange={e => onUpdateWave(wid, 'from', e.target.value)} />
+                      <span className="print-date">{formatDate(w.from) || '—'}</span>
+                    </td>
+                    <td>
+                      <input type="datetime-local" className="wave-input" value={w.to} onChange={e => onUpdateWave(wid, 'to', e.target.value)} />
+                      <span className="print-date">{formatDate(w.to) || '—'}</span>
+                    </td>
                     <td className="out-cell">{res ? <span className="renewal-val">{res.trialists.toLocaleString()}</span> : <span className="out-empty">—</span>}</td>
                     <td className="out-cell">{res ? <span className="renewal-val">{res.acquisition.toLocaleString()}</span> : <span className="out-empty">—</span>}</td>
                     <td className="out-cell">{acqPct !== null ? <span style={{ color: 'var(--accent-text)', fontWeight: 600 }}>{acqPct}%</span> : <span className="out-empty">—</span>}</td>
